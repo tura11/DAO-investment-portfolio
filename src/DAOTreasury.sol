@@ -9,7 +9,6 @@ contract DAOTreasury is ERC20, Ownable {
     error DAOTreasury__DepositTooSmall();
     error DAOTreasury__NotEnoughTokens();
     error DAOTreasury__TransferFailed();
-    error DAOTreasury__NoTokensInCirculation();
     error DAOTreasury__InsufficientFunds();
 
     uint256 public constant MIN_DEPOSIT = 0.001 ether;
@@ -26,6 +25,7 @@ contract DAOTreasury is ERC20, Ownable {
         if(msg.value < MIN_DEPOSIT) {
             revert DAOTreasury__DepositTooSmall();
         }
+
         uint256 tokensToMint = msg.value * 1000; // 1eth = 1000 tokens
 
         totalDeposits += msg.value;
@@ -42,9 +42,6 @@ contract DAOTreasury is ERC20, Ownable {
             revert DAOTreasury__NotEnoughTokens();
         }
 
-        if(totalSupply() == 0) {
-            revert DAOTreasury__NoTokensInCirculation();
-        }
 
         uint256 ethToReceive = (tokenAmount * address(this).balance) / totalSupply(); // calcualte based on defi strategy if defi earn 0.5eth and user1 has 1000 tokens, he should receive 1.5 eth
 
@@ -55,18 +52,14 @@ contract DAOTreasury is ERC20, Ownable {
         _burn(msg.sender, tokenAmount);
 
 
-        if(totalDeposits >= ethToReceive) {
-            totalDeposits -= ethToReceive;
-        }else{
-            totalDeposits = 0;
-        }
+        totalDeposits -= ethToReceive;
 
         (bool success, ) = payable(msg.sender).call{value: ethToReceive}("");
         if(!success) {
             revert DAOTreasury__TransferFailed();
-
-        emit Withdrawn(msg.sender, tokenAmount, ethToReceive);
         }
+
+         emit Withdrawn(msg.sender, tokenAmount, ethToReceive);
     }
 
 
