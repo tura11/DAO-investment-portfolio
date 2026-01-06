@@ -8,12 +8,13 @@ contract DAOTreasury is ERC20, Ownable {
 
     error DAOTreasury__DepositTooSmall();
     error DAOTreasury__NotEnoughTokens();
+    error DAOTreasury__TransferFailed();
+    error DAOTreasury__NoTokensInCirculation();
+    error DAOTreasury__InsufficientFunds();
 
     uint256 public constant MIN_DEPOSIT = 0.001 ether;
 
     uint256 totalDeposits;
-
-    uint256 totalTokensMinted;
 
     event Deposited(address indexed member, uint256 amount, uint256 tokensReceived);
     event Withdrawn(address indexed member, uint256 tokensBurned, uint256 ethReceived);
@@ -23,11 +24,13 @@ contract DAOTreasury is ERC20, Ownable {
 
     function deposit() external  payable {
         if(msg.value < MIN_DEPOSIT) {
-            revert DepositToDAOTreasury__DepositTooSmall();
+            revert DAOTreasury__DepositTooSmall();
         }
-        uint256 tokensToMint = msg.value * 1000;
+        uint256 tokensToMint = msg.value * 1000; // 1eth = 1000 tokens
+
         totalDeposits += msg.value;
-        totalTokensMinted += tokensToMint;
+
+
         _mint(msg.sender, tokensToMint);
 
         emit Deposited(msg.sender, msg.value, tokensToMint);
@@ -39,12 +42,31 @@ contract DAOTreasury is ERC20, Ownable {
             revert DAOTreasury__NotEnoughTokens();
         }
 
-        uint256 ethToReceive = (tokenAmount * address(this).balance) / totalSupply();
+        if(totalSupply() == 0) {
+            revert DAOTreasury__NoTokensInCirculation();
+        }
+
+        uint256 ethToReceive = (tokenAmount * address(this).balance) / totalSupply(); // calcualte based on defi strategy if defi earn 0.5eth and user1 has 1000 tokens, he should receive 1.5 eth
+
+        if(ethToReceive == 0) {
+            revert DAOTreasury__InsufficientFunds();
+        }
 
         _burn(msg.sender, tokenAmount);
-        totalDeposits -= ethToReceive;
+
+
+        if(totalDeposits >= ethToReceive) {
+            totalDeposits -= ethToReceive;
+        }else{
+            totalDeposits = 0;
+        }
+
+        (bool success, ) = payable(msg.sender).call{value: ethToReceive}("");
+        if(!success) {
+            revert DAOTreasury__TransferFailed();
 
         emit Withdrawn(msg.sender, tokenAmount, ethToReceive);
+        }
     }
 
 
@@ -52,7 +74,8 @@ contract DAOTreasury is ERC20, Ownable {
         return address(this).balance;
     }
 
-
-
+    function getTotalTokensMinted() external view returns (uint256) {
+        return totalSupply();
+    }
 
 }
