@@ -135,5 +135,30 @@ contract DAOTreasuryTest is Test {
         emit DAOTreasury.Withdrawn(user1, 1000 ether, 1 ether);
         treasury.withdraw(1000 ether);
     }
+
+    function testWithdrawRevertIfTransferFails() public {
+    RevertingReceiver receiver = new RevertingReceiver(treasury);
+    vm.deal(address(receiver), 1 ether);
+
+    vm.expectRevert(DAOTreasury.DAOTreasury__TransferFailed.selector);
+    receiver.depositAndWithdraw();
 }
 
+}
+
+contract RevertingReceiver {
+    DAOTreasury treasury;
+
+    constructor(DAOTreasury _treasury) {
+        treasury = _treasury;
+    }
+
+    receive() external payable {
+        revert("no ETH accepted");
+    }
+
+    function depositAndWithdraw() external {
+        treasury.deposit{value: 1 ether}();
+        treasury.withdraw(1000 ether);
+    }
+}
