@@ -11,6 +11,8 @@ contract DAOGovernance is ReentrancyGuard {
     error DAOGovernance__EmptyTitle();
     error DAOGovernance__EmptyDescription();
     error DAOGovernance__ProposalDoesNotExisit();
+    error DAOGovernance__VotingNotActive();
+    error DAOGovernance__AlreadyVoted();
 
     enum ProposalState {
         Pending,
@@ -148,6 +150,15 @@ contract DAOGovernance is ReentrancyGuard {
     function vote(uint256 proposalId, VoteType vote) external nonReentrant {
         if(proposalId >= proposalCount) {
             revert DAOGovernance__ProposalDoesNotExisit();
+        }
+        Proposal storage proposal = proposals[proposalId];
+
+        if(block.timestamp < proposal.startTime || block.timestamp > proposal.endTime) {
+            revert DAOGovernance__VotingNotActive();
+        }
+
+        if(hasVoted[proposalId][msg.sender]) {
+            revert DAOGovernance__AlreadyVoted();
         }
         
     }
