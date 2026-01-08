@@ -9,6 +9,8 @@ contract DAOGovernance is ReentrancyGuard {
     error DAOGovernance__InvalidAddress();
     error DAOGovernance__NotEnoughTokens();
     error DAOGovernance__EmptyTitle();
+    error DAOGovernance__EmptyDescription();
+    error DAOGovernance__ProposalDoesNotExisit();
 
     enum ProposalState {
         Pending,
@@ -85,12 +87,15 @@ contract DAOGovernance is ReentrancyGuard {
         bytes memory _callData,
         uint256 _ethAmount
     ) external nonReentrant returns (uint256) {
-        // Validation
+
         if(bytes(_title).length == 0) {
             revert DAOGovernance__EmptyTitle();
         }
         if(bytes(_title).length > MAX_TITLE_LENGTH || bytes(_description).length > MAX_DESCRIPTION_LENGTH) {
             revert DAOGovernance__StringTooLong();
+        }
+        if(bytes(_description).length == 0) {
+            revert DAOGovernance__EmptyDescription();
         }
         if(_targetContract == address(0)) {
             revert DAOGovernance__InvalidAddress();
@@ -120,7 +125,7 @@ contract DAOGovernance is ReentrancyGuard {
             endTime: endTime,
             executionTime: executionTime,
             executedAt: 0,
-            state: ProposalState.Active  // ✅ Od razu Active
+            state: ProposalState.Active 
         });
 
         proposals.push(newProposal);
@@ -139,7 +144,15 @@ contract DAOGovernance is ReentrancyGuard {
         return newProposalId;
     }
 
-    // Getter functions
+
+    function vote(uint256 proposalId, VoteType vote) external nonReentrant {
+        if(proposalId >= proposalCount) {
+            revert DAOGovernance__ProposalDoesNotExisit();
+        }
+        
+    }
+
+
     function getProposal(uint256 proposalId) external view returns (Proposal memory) {
         require(proposalId < proposalCount, "Invalid proposal ID");
         return proposals[proposalId];
