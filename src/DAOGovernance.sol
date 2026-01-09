@@ -13,6 +13,7 @@ contract DAOGovernance is ReentrancyGuard {
     error DAOGovernance__ProposalDoesNotExisit();
     error DAOGovernance__VotingNotActive();
     error DAOGovernance__AlreadyVoted();
+    error DAOGovernance__NoVotingPower();
 
     enum ProposalState {
         Pending,
@@ -73,6 +74,11 @@ contract DAOGovernance is ReentrancyGuard {
         uint256 ethAmount,
         uint256 startTime,
         uint256 endTime
+    );
+    event VoteCast(
+        uint256 indexed proposalId,
+        address voter,
+        VoteType voteType
     );
 
     constructor(address _treasury) {
@@ -160,7 +166,23 @@ contract DAOGovernance is ReentrancyGuard {
         if(hasVoted[proposalId][msg.sender]) {
             revert DAOGovernance__AlreadyVoted();
         }
-        
+
+        uint256 votingPower = treasury.balanceOf(msg.sender);
+        if(votingPover == 0) {
+            revert DAOGovernance__NoVotingPower();
+        }
+
+        hasVoted[proposalId][msg.sender] = true;
+        userVote[proposalId][msg.sender] = voteType;
+
+        if(voteType == VoteType.For) {
+            proposal.votesFor += votingPower;
+        } else if(voteType == VoteType.Against) {
+            proposal.votesAgainst += votingPower;
+        } else {
+            proposal.votesAbstain += votingPower;
+        }
+        emit VoteCast(msg.sender, proposalId, voteType);
     }
 
 
