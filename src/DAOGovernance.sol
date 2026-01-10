@@ -185,6 +185,38 @@ contract DAOGovernance is ReentrancyGuard {
         emit VoteCast(msg.sender, proposalId, voteType);
     }
 
+    function getProposalState(uint256 proposalId) external view returns (ProposalState) {
+        if(proposalId >= proposalCount) {
+            revert DAOGovernance__ProposalDoesNotExisit();
+        }
+
+        if(proposal.state == ProposalState.Canceled){
+            return ProposalState.Canceled;
+        }
+
+        if(block.timestamp <= proposal.endTime) {
+            return ProposalState.Active;
+        }
+
+        uint256 totalVotes = proposal.votesFor + proposal.votesAgainst + proposal.votesAbstain;
+        uint256 totalSupply = treasury.totalSupply();
+
+
+        bool quorumReached = (totalVotes * 100 / totalSupply) >= QUORUM_PERCENTAGE;
+
+        if(!quorumReached) {
+            return ProposalState.Defeated;
+        }
+
+        uint256 forPercentage = (proposal.votesFor * 100) / totalVotes;
+
+        if(forPercentage >= APPROVAL_THRESHOLD) {
+            return ProposalState.Succeeded;
+        }else{
+            return ProposalState.Defeated;
+        }
+    }
+
 
     function getProposal(uint256 proposalId) external view returns (Proposal memory) {
         require(proposalId < proposalCount, "Invalid proposal ID");
