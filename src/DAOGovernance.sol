@@ -168,7 +168,7 @@ contract DAOGovernance is ReentrancyGuard {
         }
 
         uint256 votingPower = treasury.balanceOf(msg.sender);
-        if(votingPover == 0) {
+        if(votingPower == 0) {
             revert DAOGovernance__NoVotingPower();
         }
 
