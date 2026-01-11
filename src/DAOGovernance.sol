@@ -14,6 +14,9 @@ contract DAOGovernance is ReentrancyGuard {
     error DAOGovernance__VotingNotActive();
     error DAOGovernance__AlreadyVoted();
     error DAOGovernance__NoVotingPower();
+    error DAOGovernance__ProposalNotSucceeded();
+    error DAOGovernance__ProposalAlreadyExecuted();
+    error DAOGovernance__InsufficientTresuryBalance();
 
     enum ProposalState {
         Pending,
@@ -79,6 +82,11 @@ contract DAOGovernance is ReentrancyGuard {
         uint256 indexed proposalId,
         address voter,
         VoteType voteType
+    );
+    event ProposalExecuted(
+        uint256 indexed proposalId,
+        address indexed executor,
+        bytes returnData
     );
 
     constructor(address _treasury) {
@@ -183,6 +191,50 @@ contract DAOGovernance is ReentrancyGuard {
             proposal.votesAbstain += votingPower;
         }
         emit VoteCast(msg.sender, proposalId, voteType);
+    }
+
+    function executeProposal(uint256 proposalId) external nonReentrant {
+        if(proposalId >= proposalCount) {
+            revert DAOGovernance__ProposalDoesNotExisit();
+        }
+
+        Proposal storage proposal = proposals[proposalId];
+
+
+        ProposalState currentState = getProposalState(proposalId); 
+        if(currentState != ProposalState.Succeeded) {
+            revert DAOGovernance__ProposalNotSucceeded();
+        }
+
+
+        if(block.timestamp < proposal.executionTime) {
+            revert DAOGovernance__VotingNotActive();
+        }
+
+
+        if(proposal.executedAt > 0) {
+            revert DAOGovernance__ProposalAlreadyExecuted();
+        }
+
+        if(proposal.ethAmount > 0) {
+            if(address(treasury).balance < proposal.ethAmount) {
+                revert DAOGovernance__InsufficientTresuryBalance();
+            }
+        }
+
+        proposal.executedAt = block.timestamp;
+        proposal.state = ProposalState.Executed;
+
+        (bool success, bytes memory returnData) = proposal.targetContract.call{
+            value: proposal.ethAmount
+        }(proposal.callData);
+
+        if(!success) {
+            revert DAOGovernance__ExecutionFailed();
+        }
+
+
+        emit ProposalExecuted(proposalId, msg.sender, returnData);
     }
 
     function getProposalState(uint256 proposalId) external view returns (ProposalState) {
