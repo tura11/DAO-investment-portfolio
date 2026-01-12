@@ -20,7 +20,6 @@ contract DAOGovernance is ReentrancyGuard {
     error DAOGovernance__ProposalNotSucceeded();
     error DAOGovernance__ProposalAlreadyExecuted();
     error DAOGovernance__InsufficientTreasuryBalance();
-    error DAOGovernance__ExecutionFailed();
     error DAOGovernance__TimelockNotPassed();
 
     /*//////////////////////////////////////////////////////////////
@@ -61,6 +60,8 @@ contract DAOGovernance is ReentrancyGuard {
         uint256 endTime;
         uint256 executionTime;
         uint256 executedAt;
+
+        ProposalState state;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -78,8 +79,8 @@ contract DAOGovernance is ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
     uint256 public constant VOTING_PERIOD = 7 days;
     uint256 public constant TIMELOCK_PERIOD = 2 days;
-    uint256 public constant QUORUM_PERCENTAGE = 30; // %
-    uint256 public constant APPROVAL_THRESHOLD = 51; // %
+    uint256 public constant QUORUM_PERCENTAGE = 30;
+    uint256 public constant APPROVAL_THRESHOLD = 51;
     uint256 public constant MIN_TOKENS_TO_PROPOSE = 10 ether;
     uint256 public constant MAX_TITLE_LENGTH = 100;
     uint256 public constant MAX_DESCRIPTION_LENGTH = 500;
@@ -114,9 +115,7 @@ contract DAOGovernance is ReentrancyGuard {
                             CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
     constructor(address _treasury) {
-        if (_treasury == address(0)) {
-            revert DAOGovernance__InvalidAddress();
-        }
+        if (_treasury == address(0)) revert DAOGovernance__InvalidAddress();
         treasury = DAOTreasury(_treasury);
     }
 
@@ -158,7 +157,8 @@ contract DAOGovernance is ReentrancyGuard {
                 startTime: startTime,
                 endTime: endTime,
                 executionTime: endTime + TIMELOCK_PERIOD,
-                executedAt: 0
+                executedAt: 0,
+                state: ProposalState.Active
             })
         );
 
@@ -199,19 +199,57 @@ contract DAOGovernance is ReentrancyGuard {
         hasVoted[proposalId][msg.sender] = true;
         userVote[proposalId][msg.sender] = voteType;
 
-        if (voteType == VoteType.For) {
-            proposal.votesFor += votingPower;
-        } else if (voteType == VoteType.Against) {
-            proposal.votesAgainst += votingPower;
-        } else {
-            proposal.votesAbstain += votingPower;
-        }
+        if (voteType == VoteType.For) proposal.votesFor += votingPower;
+        else if (voteType == VoteType.Against) proposal.votesAgainst += votingPower;
+        else proposal.votesAbstain += votingPower;
 
         emit VoteCast(proposalId, msg.sender, voteType, votingPower);
     }
 
     /*//////////////////////////////////////////////////////////////
-                        PROPOSAL EXECUTION
+                        FINALIZATION
+    //////////////////////////////////////////////////////////////*/
+    function finalizeProposal(uint256 proposalId) external {
+        if (proposalId >= proposalCount)
+            revert DAOGovernance__ProposalDoesNotExist();
+
+        Proposal storage proposal = proposals[proposalId];
+
+        if (block.timestamp <= proposal.endTime)
+            revert DAOGovernance__VotingNotActive();
+
+        if (proposal.state != ProposalState.Active) return;
+
+        uint256 totalVotes =
+            proposal.votesFor +
+            proposal.votesAgainst +
+            proposal.votesAbstain;
+
+        uint256 totalSupply = treasury.totalSupply();
+        if (totalSupply == 0) {
+            proposal.state = ProposalState.Defeated;
+            return;
+        }
+
+        bool quorumReached =
+            (totalVotes * 100) / totalSupply >= QUORUM_PERCENTAGE;
+
+        if (!quorumReached) {
+            proposal.state = ProposalState.Defeated;
+            return;
+        }
+
+        uint256 forPercentage =
+            (proposal.votesFor * 100) / totalVotes;
+
+        proposal.state =
+            forPercentage >= APPROVAL_THRESHOLD
+                ? ProposalState.Succeeded
+                : ProposalState.Defeated;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        EXECUTION
     //////////////////////////////////////////////////////////////*/
     function executeProposal(uint256 proposalId) external nonReentrant {
         if (proposalId >= proposalCount)
@@ -219,7 +257,7 @@ contract DAOGovernance is ReentrancyGuard {
 
         Proposal storage proposal = proposals[proposalId];
 
-        if (getProposalState(proposalId) != ProposalState.Succeeded)
+        if (proposal.state != ProposalState.Succeeded)
             revert DAOGovernance__ProposalNotSucceeded();
 
         if (block.timestamp < proposal.executionTime)
@@ -231,15 +269,15 @@ contract DAOGovernance is ReentrancyGuard {
         if (proposal.ethAmount > address(treasury).balance)
             revert DAOGovernance__InsufficientTreasuryBalance();
 
-        
         proposal.executedAt = block.timestamp;
+        proposal.state = ProposalState.Executed;
 
-        
-        bytes memory returnData = treasury.executeTransaction(
-            proposal.targetContract,
-            proposal.ethAmount,
-            proposal.callData
-        );
+        bytes memory returnData =
+            treasury.executeTransaction(
+                proposal.targetContract,
+                proposal.ethAmount,
+                proposal.callData
+            );
 
         emit ProposalExecuted(proposalId, msg.sender, returnData);
     }
@@ -248,43 +286,14 @@ contract DAOGovernance is ReentrancyGuard {
                         VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
     function getProposalState(uint256 proposalId)
-        public
+        external
         view
         returns (ProposalState)
     {
         if (proposalId >= proposalCount)
             revert DAOGovernance__ProposalDoesNotExist();
 
-        Proposal storage proposal = proposals[proposalId];
-
-        if (proposal.executedAt != 0) {
-            return ProposalState.Executed;
-        }
-
-        if (block.timestamp <= proposal.endTime) {
-            return ProposalState.Active;
-        }
-
-        uint256 totalVotes =
-            proposal.votesFor +
-            proposal.votesAgainst +
-            proposal.votesAbstain;
-
-        uint256 totalSupply = treasury.totalSupply();
-        if (totalSupply == 0) return ProposalState.Defeated;
-
-        bool quorumReached =
-            (totalVotes * 100) / totalSupply >= QUORUM_PERCENTAGE;
-
-        if (!quorumReached) return ProposalState.Defeated;
-
-        uint256 forPercentage =
-            (proposal.votesFor * 100) / totalVotes;
-
-        return
-            forPercentage >= APPROVAL_THRESHOLD
-                ? ProposalState.Succeeded
-                : ProposalState.Defeated;
+        return proposals[proposalId].state;
     }
 
     function getProposal(uint256 proposalId)
