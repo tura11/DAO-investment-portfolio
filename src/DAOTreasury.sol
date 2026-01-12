@@ -10,10 +10,20 @@ contract DAOTreasury is ERC20, Ownable {
     error DAOTreasury__NotEnoughTokens();
     error DAOTreasury__TransferFailed();
     error DAOTreasury__InsufficientFunds();
+    error DAOTreasury__InvalidAddress();
+    error DAOTreasury__GovernanceAlreadySet();
+    error DAOTreasury__Unauthorized();
+
+    event TransactionExecuted(
+        address indexed target,
+        uint256 value,
+        bytes data
+    );
 
     uint256 public constant MIN_DEPOSIT = 0.001 ether;
 
-    uint256 totalDeposits;
+    uint256 public totalDeposits;
+    address public governance;
 
     event Deposited(address indexed member, uint256 amount, uint256 tokensReceived);
     event Withdrawn(address indexed member, uint256 tokensBurned, uint256 ethReceived);
@@ -60,6 +70,39 @@ contract DAOTreasury is ERC20, Ownable {
         }
 
          emit Withdrawn(msg.sender, tokenAmount, ethToReceive);
+    }
+
+
+    function setGovernance(address _governance) external onlyOwner {
+        if(_governance == address(0)) {
+            revert DAOTreasury__InvalidAddress();
+        }
+
+        if(_governance == address(this)) {
+            revert DAOTreasury__GovernanceAlreadySet();
+            
+        }
+
+        governance = _governance;
+    }
+
+    function executeTransaction(address target, uint256 value, bytes memory data) external returns (bytes memory) {
+        if(msg.sender != governance) {
+            revert DAOTreasury__Unauthorized();
+        }
+        if(address(this).balance < value) {
+            revert DAOTreasury__InsufficientFunds();
+        }
+
+        (bool success, bytes memory returndata) = target.call{value: value}(data);
+
+        if(!success) {
+            revert DAOTreasury__TransferFailed();
+        }
+
+        emit TransactionExecuted(target, value, data);
+
+        return returndata;
     }
 
 
