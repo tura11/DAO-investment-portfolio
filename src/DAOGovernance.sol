@@ -21,6 +21,10 @@ contract DAOGovernance is ReentrancyGuard {
     error DAOGovernance__ProposalAlreadyExecuted();
     error DAOGovernance__InsufficientTreasuryBalance();
     error DAOGovernance__TimelockNotPassed();
+    error DAOGovernance__ProposalNotActive();
+    error DAOGovernance__CannotCancelProposal();
+    error DAOGovernance__UnauthorizedCancel();
+
 
     /*//////////////////////////////////////////////////////////////
                                 ENUMS
@@ -280,6 +284,29 @@ contract DAOGovernance is ReentrancyGuard {
             );
 
         emit ProposalExecuted(proposalId, msg.sender, returnData);
+    }
+
+
+    function cancelProposal(uint256 proposalId) external nonReentrant {
+        if (proposalId >= proposalCount)
+            revert DAOGovernance__ProposalDoesNotExist();
+        
+        Proposal storage proposal = proposals[proposalId];
+        
+        if(proposal.state == ProposalState.Executed ||
+         proposal.state == ProposalState.Succeeded) {
+            revert DAOGovernance__CannotCancelProposal();
+        }
+
+        bool isProposer = msg.sender == proposal.proposer;
+        bool proposerLostPower = treasury.balanceOf(proposal.proposer) < MIN_TOKENS_TO_PROPOSE;
+
+        if (!isProposer && !proposerLostPower) {
+            revert DAOGovernance__UnauthorizedCancel();
+         }
+
+        proposal.state = ProposalState.Canceled;
+        
     }
 
     /*//////////////////////////////////////////////////////////////
