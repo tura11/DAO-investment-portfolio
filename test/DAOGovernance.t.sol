@@ -31,10 +31,10 @@ contract DAOGovernanceTest is Test {
         
         vm.deal(user1, 100 ether);
         vm.deal(user2, 100 ether);
-        vm.deal(user3, 100 ether);
+        vm.deal(user3, 1 ether); //for testing reverts with tokens
     }
 
-    function testCreateProposal() public {
+    function testCreateProposalSuccesful() public {
         // User1 deposits to get tokens
         vm.prank(user1);
         treasury.deposit{value: 1 ether}();
@@ -52,15 +52,80 @@ contract DAOGovernanceTest is Test {
             0   // no ETH amount
         );
         
-        // Verify proposal was created
-        assertEq(proposalId, 0); // First proposal
+
+        assertEq(proposalId, 0);
         assertEq(governance.getProposalCount(), 1);
         
-        // Get proposal and verify details
+    
         DAOGovernance.Proposal memory proposal = governance.getProposal(proposalId);
         assertEq(proposal.title, "Test Proposal");
         assertEq(proposal.proposer, user1);
         assertEq(proposal.targetContract, mockTarget);
         assertEq(uint(proposal.state), uint(DAOGovernance.ProposalState.Active));
     }
+
+    function testCreateProposalRevertEmptyTitle() public {
+        vm.prank(user1);
+        vm.expectRevert(DAOGovernance.DAOGovernance__EmptyTitle.selector);
+        governance.createProposal(
+            "",
+            "This is a test proposal description",
+            mockTarget,
+            "", // empty calldata for now
+            0   // no ETH amount
+        );
+    }
+
+    function testCreateProposalRevertEmptyDescription() public {
+        vm.prank(user1);
+        vm.expectRevert(DAOGovernance.DAOGovernance__EmptyDescription.selector);
+        governance.createProposal(
+            "Test Proposal",
+            "",
+            mockTarget,
+            "", // empty calldata for now
+            0   // no ETH amount
+        );
+    }
+
+    function testCreateProposalRevertStringTooLong() public {
+        vm.prank(user1);
+        vm.expectRevert(DAOGovernance.DAOGovernance__StringTooLong.selector);
+        governance.createProposal(
+            "Test Proposal dasdsadsadasdasdasdadasrderwqfajfsfsajklfjksafksalfkasfjai0wqejiwajipfsaifsalkfsaflkjsafjsafjasfiofweqjifqwfjipwpiafipwaijfwqapijfwaijfsipafsajpkfksafkasfkasjfiqwipjfwqjipfqwpijfwqipjfwqjip",
+            "Test",
+            mockTarget,
+            "", // empty calldata for now
+            0   // no ETH amount
+        );
+    }
+
+
+    function testCreateProposalRevertInvalidTargetAddress() public {
+        vm.prank(user1);
+        vm.expectRevert(DAOGovernance.DAOGovernance__InvalidAddress.selector);
+        governance.createProposal(
+            "Test Proposal",
+            "This is a test proposal description",
+            address(0),
+            "", // empty calldata for now
+            0   // no ETH amount
+        );
+    }
+
+    function testCreateProposalRevertNotEnoughTokens() public {
+        vm.prank(user3); // user3 has 1 token min value is 10.
+        vm.expectRevert(DAOGovernance.DAOGovernance__NotEnoughTokens.selector);
+        governance.createProposal(
+            "Test Proposal",
+            "This is a test proposal description",
+            mockTarget,
+            "", // empty calldata for now
+            0   // no ETH amount
+        );
+    }
+
+
+
+
 }
