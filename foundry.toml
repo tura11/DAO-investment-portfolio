@@ -7,3 +7,7 @@ libs = ["lib"]
 remappingds = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/"
 ]
+
+via_ir = true
+optimizer = true
+optimizer_runs = 200
