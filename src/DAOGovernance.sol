@@ -85,7 +85,7 @@ contract DAOGovernance is ReentrancyGuard {
     uint256 public constant TIMELOCK_PERIOD = 2 days;
     uint256 public constant QUORUM_PERCENTAGE = 30;
     uint256 public constant APPROVAL_THRESHOLD = 51;
-    uint256 public constant MIN_TOKENS_TO_PROPOSE = 10 ether;
+    uint256 public constant MIN_TOKENS_TO_PROPOSE = 3 ether;
     uint256 public constant MAX_TITLE_LENGTH = 100;
     uint256 public constant MAX_DESCRIPTION_LENGTH = 500;
 
