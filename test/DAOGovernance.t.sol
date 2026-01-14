@@ -39,12 +39,12 @@ contract DAOGovernanceTest is Test {
     //////////////////////////////////////////////////////////////*/
 
     function testCreateProposalSuccesful() public {
-        // User1 deposits to get tokens
+        // User1 deposits to get token
         vm.prank(user1);
-        treasury.deposit{value: 1 ether}();
+        treasury.deposit{value: 3 ether}();
         
-        // User1 has 1000 tokens (1 ETH = 1000 tokens)
-        assertEq(treasury.balanceOf(user1), 1000 ether);
+        // User1 has 1 token (1 ETH = 1 token)
+        assertEq(treasury.balanceOf(user1), 3 ether);
         
         // Create proposal
         vm.prank(user1);
@@ -136,7 +136,7 @@ contract DAOGovernanceTest is Test {
 
     function testVoteSuccessful() public {
         vm.startPrank(user1);
-        treasury.deposit{value: 1 ether}();
+        treasury.deposit{value: 3 ether}();
         governance.createProposal(
             "Test Proposal",
             "This is a test proposal description",
@@ -149,7 +149,7 @@ contract DAOGovernanceTest is Test {
         treasury.deposit{value: 1 ether}();
         governance.vote(0, DAOGovernance.VoteType.For);
         DAOGovernance.Proposal memory proposal = governance.getProposal(0);
-        assertEq(proposal.votesFor, 1000 ether); // 1000 tokens because he deposit 1 ether
+        assertEq(proposal.votesFor, 1 ether);
         assertEq(proposal.votesAgainst, 0);
         assertEq(proposal.votesAbstain, 0);
     }

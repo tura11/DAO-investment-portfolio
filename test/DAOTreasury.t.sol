@@ -26,9 +26,9 @@ contract DAOTreasuryTest is Test {
     function testDeposit() public {
         vm.prank(user1);
         treasury.deposit{value: 1 ether}();
-        assertEq(treasury.balanceOf(user1), 1000 ether);
+        assertEq(treasury.balanceOf(user1), 1 ether);
         assertEq(treasury.getTreasuryBalance(), 1 ether);
-        assertEq(treasury.getTotalTokensMinted(), 1000 ether);
+        assertEq(treasury.getTotalTokensMinted(), 1 ether);
     }
 
     function testDepositRevertIfDepositTooSmall() public {
@@ -40,7 +40,7 @@ contract DAOTreasuryTest is Test {
     function testDepositEmitsEvent() public {
         vm.prank(user1);
         vm.expectEmit(true, false, false, true);
-        emit DAOTreasury.Deposited(user1, 1 ether, 1000 ether);
+        emit DAOTreasury.Deposited(user1, 1 ether, 1 ether);
         treasury.deposit{value: 1 ether}();
     }
 
@@ -55,13 +55,13 @@ contract DAOTreasuryTest is Test {
         uint256 balanceBefore = user1.balance;
         
         vm.prank(user1);
-        treasury.withdraw(500 ether);
+        treasury.withdraw(0.5 ether);
         
 
         uint256 balanceAfter = user1.balance;
 
         // Assertions
-        assertEq(treasury.balanceOf(user1), 500 ether);
+        assertEq(treasury.balanceOf(user1), 0.5 ether);
         assertEq(balanceAfter - balanceBefore, 0.5 ether);
     }
 
@@ -80,12 +80,12 @@ contract DAOTreasuryTest is Test {
         // user2 has: 2000 tokens (66.67%)
         
         assertEq(treasury.getTreasuryBalance(), 3 ether);
-        assertEq(treasury.balanceOf(user1), 1000 ether);
-        assertEq(treasury.balanceOf(user2), 2000 ether);
+        assertEq(treasury.balanceOf(user1), 1 ether);
+        assertEq(treasury.balanceOf(user2), 2 ether);
         
 
         vm.prank(user1);
-        treasury.withdraw(1000 ether);
+        treasury.withdraw(1 ether);
         
 
         assertEq(treasury.getTreasuryBalance(), 2 ether);
@@ -99,12 +99,12 @@ contract DAOTreasuryTest is Test {
         treasury.deposit{value: 1 ether}();
         
    
-        assertEq(treasury.balanceOf(user1), 1000 ether);
-        assertEq(treasury.balanceOf(user2), 1000 ether);
+        assertEq(treasury.balanceOf(user1), 1 ether);
+        assertEq(treasury.balanceOf(user2), 1 ether);
         
    
         vm.prank(user1);
-        treasury.withdraw(1000 ether);
+        treasury.withdraw(1 ether);
         
 
         assertEq(treasury.getTreasuryBalance(), 1 ether);
@@ -123,7 +123,7 @@ contract DAOTreasuryTest is Test {
 
         vm.prank(user1);
         vm.expectRevert(DAOTreasury.DAOTreasury__InsufficientFunds.selector);
-        treasury.withdraw(1000 ether);
+        treasury.withdraw(1 ether);
     }
 
     function testWithdrawEmitsEvent() public {
@@ -132,8 +132,8 @@ contract DAOTreasuryTest is Test {
 
         vm.prank(user1);
         vm.expectEmit(true, false, false, true);
-        emit DAOTreasury.Withdrawn(user1, 1000 ether, 1 ether);
-        treasury.withdraw(1000 ether);
+        emit DAOTreasury.Withdrawn(user1, 1 ether, 1 ether);
+        treasury.withdraw(1 ether);
     }
 
     function testWithdrawRevertIfTransferFails() public {
@@ -159,6 +159,6 @@ contract RevertingReceiver {
 
     function depositAndWithdraw() external {
         treasury.deposit{value: 1 ether}();
-        treasury.withdraw(1000 ether);
+        treasury.withdraw(1 ether);
     }
 }
