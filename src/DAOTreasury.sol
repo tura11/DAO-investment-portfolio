@@ -36,7 +36,7 @@ contract DAOTreasury is ERC20, Ownable {
             revert DAOTreasury__DepositTooSmall();
         }
 
-        uint256 tokensToMint = msg.value * 1000; // 1eth = 1000 tokens
+        uint256 tokensToMint = msg.value; // 1eth = 1 token
 
         totalDeposits += msg.value;
 
