@@ -34,6 +34,10 @@ contract DAOGovernanceTest is Test {
         vm.deal(user3, 1 ether); //for testing reverts with tokens
     }
 
+    /*//////////////////////////////////////////////////////////////
+                       CREATE PROPOSAL TESTS
+    //////////////////////////////////////////////////////////////*/
+
     function testCreateProposalSuccesful() public {
         // User1 deposits to get tokens
         vm.prank(user1);
@@ -123,6 +127,31 @@ contract DAOGovernanceTest is Test {
             "", // empty calldata for now
             0   // no ETH amount
         );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        VOTE TESTS
+    //////////////////////////////////////////////////////////////*/
+
+
+    function testVoteSuccessful() public {
+        vm.startPrank(user1);
+        treasury.deposit{value: 1 ether}();
+        governance.createProposal(
+            "Test Proposal",
+            "This is a test proposal description",
+            mockTarget,
+            "", // empty calldata for now
+            0   // no ETH amount
+        );
+        vm.stopPrank();
+        vm.startPrank(user2);
+        treasury.deposit{value: 1 ether}();
+        governance.vote(0, DAOGovernance.VoteType.For);
+        DAOGovernance.Proposal memory proposal = governance.getProposal(0);
+        assertEq(proposal.votesFor, 1000 ether); // 1000 tokens because he deposit 1 ether
+        assertEq(proposal.votesAgainst, 0);
+        assertEq(proposal.votesAbstain, 0);
     }
 
 
