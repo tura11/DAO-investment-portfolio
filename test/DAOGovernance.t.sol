@@ -154,7 +154,30 @@ contract DAOGovernanceTest is Test {
         assertEq(proposal.votesAbstain, 0);
     }
 
+    function testVoteRevertIfProposalDoesNotExist() public {
+        vm.expectRevert(DAOGovernance.DAOGovernance__ProposalDoesNotExist.selector);
+        governance.vote(1, DAOGovernance.VoteType.For);
+    }
 
+
+    function testVoteRevertIfVotingNotActive() public {
+        vm.startPrank(user1);
+        treasury.deposit{value: 3 ether}();
+        governance.createProposal(
+            "Test Proposal",
+            "This is a test proposal description",
+            mockTarget,
+            "", // empty calldata for now
+            0   // no ETH amount
+        );
+        vm.stopPrank();
+        
+        vm.startPrank(user2);
+        treasury.deposit{value: 1 ether}();
+        vm.warp(block.timestamp + 8 days); // 7 days voting period
+        vm.expectRevert(DAOGovernance.DAOGovernance__VotingNotActive.selector);
+        governance.vote(0, DAOGovernance.VoteType.For);
+    }
 
 
 }
