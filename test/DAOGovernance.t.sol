@@ -1,4 +1,4 @@
-pragma solidity ^0.8.30;
+pragma solidity ^0.8.24;
 
 import {Test, console} from "forge-std/Test.sol";
 import {DAOGovernance} from "../src/DAOGovernance.sol";

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.30;
+pragma solidity ^0.8.24;
 
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { DAOTreasury } from "./DAOTreasury.sol";
@@ -115,7 +115,7 @@ contract DAOGovernance is ReentrancyGuard {
         address _targetContract,
         bytes calldata _callData,
         uint256 _ethAmount
-    ) external nonReentrant returns (uint256) {
+    ) external  returns (uint256) {
     
         _validateProposalInputs(_title, _description, _targetContract);
         
@@ -163,7 +163,7 @@ contract DAOGovernance is ReentrancyGuard {
     /*//////////////////////////////////////////////////////////////
                                 VOTING 
     //////////////////////////////////////////////////////////////*/
-    function vote(uint256 proposalId, VoteType voteType) external nonReentrant {
+    function vote(uint256 proposalId, VoteType voteType) external  {
         if (proposalId >= proposalCount) revert DAOGovernance__ProposalDoesNotExist();
 
         Proposal storage proposal = proposals[proposalId];
@@ -199,31 +199,37 @@ contract DAOGovernance is ReentrancyGuard {
         if (proposalId >= proposalCount) revert DAOGovernance__ProposalDoesNotExist();
 
         Proposal storage proposal = proposals[proposalId];
+
         if (block.timestamp <= proposal.endTime) revert DAOGovernance__VotingNotActive();
         if (proposal.state != ProposalState.Active) return;
 
-     
-        uint256 totalVotes = proposal.votesFor + proposal.votesAgainst + proposal.votesAbstain;
+        proposal.state = _calculateFinalState(proposal);
+    }
+
+    function _calculateFinalState(
+        Proposal storage proposal
+    ) internal view returns (ProposalState) {
+        uint256 totalVotes = proposal.votesFor
+            + proposal.votesAgainst
+            + proposal.votesAbstain;
+
         uint256 totalSupply = treasury.totalSupply();
-        
         if (totalSupply == 0) {
-            proposal.state = ProposalState.Defeated;
-            return;
+            return ProposalState.Defeated;
         }
 
-   
         uint256 quorumPercentage = (totalVotes * 100) / totalSupply;
         if (quorumPercentage < QUORUM_PERCENTAGE) {
-            proposal.state = ProposalState.Defeated;
-            return;
+            return ProposalState.Defeated;
         }
 
-  
         uint256 forPercentage = (proposal.votesFor * 100) / totalVotes;
-        proposal.state = forPercentage >= APPROVAL_THRESHOLD 
-            ? ProposalState.Succeeded 
+
+        return forPercentage >= APPROVAL_THRESHOLD
+            ? ProposalState.Succeeded
             : ProposalState.Defeated;
     }
+
 
     /*//////////////////////////////////////////////////////////////
                         EXECUTION PROPOSAL

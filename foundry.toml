@@ -2,19 +2,14 @@
 src = "src"
 out = "out"
 libs = ["lib"]
-solc_version = "0.8.30"
+solc_version = "0.8.24"
 via_ir = true
 optimizer = true
 optimizer_runs = 10000
 
-[profile.coverage]
-via_ir = true
-optimizer = true
-optimizer_runs = 20000
-extra_output = ["storageLayout", "metadata"]
 
-[fmt]
-line_length = 120
+
+
 
 [fuzz]
 runs = 256
