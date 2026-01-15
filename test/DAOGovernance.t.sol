@@ -179,5 +179,42 @@ contract DAOGovernanceTest is Test {
         governance.vote(0, DAOGovernance.VoteType.For);
     }
 
+    function testVoteRevertIfAlreadyVoted() public {
+        vm.startPrank(user1);
+        treasury.deposit{value: 3 ether}();
+        governance.createProposal(
+            "Test Proposal",
+            "This is a test proposal description",
+            mockTarget,
+            "", // empty calldata for now
+            0   // no ETH amount
+        );
+        vm.stopPrank();
+        
+        vm.startPrank(user2);
+        treasury.deposit{value: 1 ether}();
+        governance.vote(0, DAOGovernance.VoteType.For);
+        vm.expectRevert(DAOGovernance.DAOGovernance__AlreadyVoted.selector);
+        governance.vote(0, DAOGovernance.VoteType.For);
+    }
+
+    function testVoteRevertIfNoVotingPower() public {
+        vm.startPrank(user1);
+        treasury.deposit{value: 3 ether}();
+        governance.createProposal(
+            "Test Proposal",
+            "This is a test proposal description",
+            mockTarget,
+            "", // empty calldata for now
+            0   // no ETH amount
+        );
+        vm.stopPrank();
+        
+        vm.startPrank(user2);
+        vm.expectRevert(DAOGovernance.DAOGovernance__NoVotingPower.selector);
+        governance.vote(0, DAOGovernance.VoteType.For);
+    }
+
+
 
 }
