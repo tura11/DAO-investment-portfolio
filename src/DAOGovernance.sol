@@ -4,6 +4,8 @@ pragma solidity ^0.8.30;
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { DAOTreasury } from "./DAOTreasury.sol";
 
+
+
 contract DAOGovernance is ReentrancyGuard {
     /*//////////////////////////////////////////////////////////////
                                 ERRORS
@@ -25,24 +27,11 @@ contract DAOGovernance is ReentrancyGuard {
     error DAOGovernance__CannotCancelProposal();
     error DAOGovernance__UnauthorizedCancel();
 
-
     /*//////////////////////////////////////////////////////////////
                                 ENUMS
     //////////////////////////////////////////////////////////////*/
-    enum ProposalState {
-        Pending,
-        Active,
-        Succeeded,
-        Defeated,
-        Executed,
-        Canceled
-    }
-
-    enum VoteType {
-        Against,
-        For,
-        Abstain
-    }
+    enum ProposalState { Pending, Active, Succeeded, Defeated, Executed, Canceled }
+    enum VoteType { Against, For, Abstain }
 
     /*//////////////////////////////////////////////////////////////
                                 STRUCTS
@@ -55,16 +44,13 @@ contract DAOGovernance is ReentrancyGuard {
         address targetContract;
         bytes callData;
         uint256 ethAmount;
-
         uint256 votesFor;
         uint256 votesAgainst;
         uint256 votesAbstain;
-
         uint256 startTime;
         uint256 endTime;
         uint256 executionTime;
         uint256 executedAt;
-
         ProposalState state;
     }
 
@@ -74,7 +60,6 @@ contract DAOGovernance is ReentrancyGuard {
     Proposal[] public proposals;
     mapping(uint256 => mapping(address => bool)) public hasVoted;
     mapping(uint256 => mapping(address => VoteType)) public userVote;
-
     uint256 public proposalCount;
     DAOTreasury public immutable treasury;
 
@@ -101,14 +86,12 @@ contract DAOGovernance is ReentrancyGuard {
         uint256 startTime,
         uint256 endTime
     );
-
     event VoteCast(
         uint256 indexed proposalId,
         address indexed voter,
         VoteType voteType,
         uint256 votingPower
     );
-
     event ProposalExecuted(
         uint256 indexed proposalId,
         address indexed executor,
@@ -124,50 +107,46 @@ contract DAOGovernance is ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                        PROPOSAL CREATION
+                        PROPOSAL CREATION 
     //////////////////////////////////////////////////////////////*/
     function createProposal(
-        string memory _title,
-        string memory _description,
+        string calldata _title,
+        string calldata _description,
         address _targetContract,
-        bytes memory _callData,
+        bytes calldata _callData,
         uint256 _ethAmount
     ) external nonReentrant returns (uint256) {
-        if (bytes(_title).length == 0) revert DAOGovernance__EmptyTitle();
-        if (bytes(_description).length == 0) revert DAOGovernance__EmptyDescription();
-        if (
-            bytes(_title).length > MAX_TITLE_LENGTH ||
-            bytes(_description).length > MAX_DESCRIPTION_LENGTH
-        ) revert DAOGovernance__StringTooLong();
-        if (_targetContract == address(0)) revert DAOGovernance__InvalidAddress();
-        if (treasury.balanceOf(msg.sender) < MIN_TOKENS_TO_PROPOSE)
-            revert DAOGovernance__NotEnoughTokens();
-
+    
+        _validateProposalInputs(_title, _description, _targetContract);
+        
+        
+        uint256 currentProposalId = proposalCount;
+        
+    
         uint256 startTime = block.timestamp;
         uint256 endTime = startTime + VOTING_PERIOD;
-
-        proposals.push(
-            Proposal({
-                id: proposalCount,
-                title: _title,
-                description: _description,
-                proposer: msg.sender,
-                targetContract: _targetContract,
-                callData: _callData,
-                ethAmount: _ethAmount,
-                votesFor: 0,
-                votesAgainst: 0,
-                votesAbstain: 0,
-                startTime: startTime,
-                endTime: endTime,
-                executionTime: endTime + TIMELOCK_PERIOD,
-                executedAt: 0,
-                state: ProposalState.Active
-            })
-        );
+        
+        
+        proposals.push(Proposal({
+            id: currentProposalId,
+            title: _title,
+            description: _description,
+            proposer: msg.sender,
+            targetContract: _targetContract,
+            callData: _callData,
+            ethAmount: _ethAmount,
+            votesFor: 0,
+            votesAgainst: 0,
+            votesAbstain: 0,
+            startTime: startTime,
+            endTime: endTime,
+            executionTime: endTime + TIMELOCK_PERIOD,
+            executedAt: 0,
+            state: ProposalState.Active
+        }));
 
         emit ProposalCreated(
-            proposalCount,
+            currentProposalId,
             msg.sender,
             _title,
             _targetContract,
@@ -177,25 +156,23 @@ contract DAOGovernance is ReentrancyGuard {
         );
 
         proposalCount++;
-        return proposalCount - 1;
+        return currentProposalId;
     }
 
+
     /*//////////////////////////////////////////////////////////////
-                                VOTING
+                                VOTING 
     //////////////////////////////////////////////////////////////*/
     function vote(uint256 proposalId, VoteType voteType) external nonReentrant {
-        if (proposalId >= proposalCount)
-            revert DAOGovernance__ProposalDoesNotExist();
+        if (proposalId >= proposalCount) revert DAOGovernance__ProposalDoesNotExist();
 
         Proposal storage proposal = proposals[proposalId];
+   
+        uint256 currentTime = block.timestamp;
+        if (currentTime < proposal.startTime || currentTime > proposal.endTime) 
+            revert DAOGovernance__VotingNotActive();
 
-        if (
-            block.timestamp < proposal.startTime ||
-            block.timestamp > proposal.endTime
-        ) revert DAOGovernance__VotingNotActive();
-
-        if (hasVoted[proposalId][msg.sender])
-            revert DAOGovernance__AlreadyVoted();
+        if (hasVoted[proposalId][msg.sender]) revert DAOGovernance__AlreadyVoted();
 
         uint256 votingPower = treasury.balanceOf(msg.sender);
         if (votingPower == 0) revert DAOGovernance__NoVotingPower();
@@ -203,133 +180,135 @@ contract DAOGovernance is ReentrancyGuard {
         hasVoted[proposalId][msg.sender] = true;
         userVote[proposalId][msg.sender] = voteType;
 
-        if (voteType == VoteType.For) proposal.votesFor += votingPower;
-        else if (voteType == VoteType.Against) proposal.votesAgainst += votingPower;
-        else proposal.votesAbstain += votingPower;
+     
+        if (voteType == VoteType.For) {
+            proposal.votesFor += votingPower;
+        } else if (voteType == VoteType.Against) {
+            proposal.votesAgainst += votingPower;
+        } else {
+            proposal.votesAbstain += votingPower;
+        }
 
         emit VoteCast(proposalId, msg.sender, voteType, votingPower);
     }
 
     /*//////////////////////////////////////////////////////////////
-                        FINALIZATION
+                        FINALIZATION 
     //////////////////////////////////////////////////////////////*/
     function finalizeProposal(uint256 proposalId) external {
-        if (proposalId >= proposalCount)
-            revert DAOGovernance__ProposalDoesNotExist();
+        if (proposalId >= proposalCount) revert DAOGovernance__ProposalDoesNotExist();
 
         Proposal storage proposal = proposals[proposalId];
-
-        if (block.timestamp <= proposal.endTime)
-            revert DAOGovernance__VotingNotActive();
-
+        if (block.timestamp <= proposal.endTime) revert DAOGovernance__VotingNotActive();
         if (proposal.state != ProposalState.Active) return;
 
-        uint256 totalVotes =
-            proposal.votesFor +
-            proposal.votesAgainst +
-            proposal.votesAbstain;
-
+     
+        uint256 totalVotes = proposal.votesFor + proposal.votesAgainst + proposal.votesAbstain;
         uint256 totalSupply = treasury.totalSupply();
+        
         if (totalSupply == 0) {
             proposal.state = ProposalState.Defeated;
             return;
         }
 
-        bool quorumReached =
-            (totalVotes * 100) / totalSupply >= QUORUM_PERCENTAGE;
-
-        if (!quorumReached) {
+   
+        uint256 quorumPercentage = (totalVotes * 100) / totalSupply;
+        if (quorumPercentage < QUORUM_PERCENTAGE) {
             proposal.state = ProposalState.Defeated;
             return;
         }
 
-        uint256 forPercentage =
-            (proposal.votesFor * 100) / totalVotes;
-
-        proposal.state =
-            forPercentage >= APPROVAL_THRESHOLD
-                ? ProposalState.Succeeded
-                : ProposalState.Defeated;
+  
+        uint256 forPercentage = (proposal.votesFor * 100) / totalVotes;
+        proposal.state = forPercentage >= APPROVAL_THRESHOLD 
+            ? ProposalState.Succeeded 
+            : ProposalState.Defeated;
     }
 
     /*//////////////////////////////////////////////////////////////
-                        EXECUTION
+                        EXECUTION PROPOSAL
     //////////////////////////////////////////////////////////////*/
     function executeProposal(uint256 proposalId) external nonReentrant {
-        if (proposalId >= proposalCount)
-            revert DAOGovernance__ProposalDoesNotExist();
+        if (proposalId >= proposalCount) revert DAOGovernance__ProposalDoesNotExist();
 
         Proposal storage proposal = proposals[proposalId];
-
-        if (proposal.state != ProposalState.Succeeded)
-            revert DAOGovernance__ProposalNotSucceeded();
-
-        if (block.timestamp < proposal.executionTime)
-            revert DAOGovernance__TimelockNotPassed();
-
-        if (proposal.executedAt != 0)
-            revert DAOGovernance__ProposalAlreadyExecuted();
-
-        if (proposal.ethAmount > address(treasury).balance)
+        
+      
+        if (proposal.state != ProposalState.Succeeded) revert DAOGovernance__ProposalNotSucceeded();
+        if (block.timestamp < proposal.executionTime) revert DAOGovernance__TimelockNotPassed();
+        if (proposal.executedAt != 0) revert DAOGovernance__ProposalAlreadyExecuted();
+        
+     
+        uint256 treasuryBalance = address(treasury).balance;
+        if (proposal.ethAmount > treasuryBalance) 
             revert DAOGovernance__InsufficientTreasuryBalance();
 
+    
         proposal.executedAt = block.timestamp;
         proposal.state = ProposalState.Executed;
 
-        bytes memory returnData =
-            treasury.executeTransaction(
-                proposal.targetContract,
-                proposal.ethAmount,
-                proposal.callData
-            );
+       
+        bytes memory returnData = treasury.executeTransaction(
+            proposal.targetContract,
+            proposal.ethAmount,
+            proposal.callData
+        );
 
         emit ProposalExecuted(proposalId, msg.sender, returnData);
     }
 
-
     function cancelProposal(uint256 proposalId) external nonReentrant {
-        if (proposalId >= proposalCount)
-            revert DAOGovernance__ProposalDoesNotExist();
+        if (proposalId >= proposalCount) revert DAOGovernance__ProposalDoesNotExist();
         
         Proposal storage proposal = proposals[proposalId];
         
-        if(proposal.state == ProposalState.Executed ||
-         proposal.state == ProposalState.Succeeded) {
+      
+        if (proposal.state == ProposalState.Executed || proposal.state == ProposalState.Succeeded) {
             revert DAOGovernance__CannotCancelProposal();
         }
 
+     
         bool isProposer = msg.sender == proposal.proposer;
         bool proposerLostPower = treasury.balanceOf(proposal.proposer) < MIN_TOKENS_TO_PROPOSE;
 
         if (!isProposer && !proposerLostPower) {
             revert DAOGovernance__UnauthorizedCancel();
-         }
+        }
 
         proposal.state = ProposalState.Canceled;
+    }
+        /*//////////////////////////////////////////////////////////////
+                        HELPER FUNCS
+    //////////////////////////////////////////////////////////////*/
+    function _validateProposalInputs(
+        string calldata _title,
+        string calldata _description,
+        address _targetContract
+    ) private view {
         
+        uint256 titleLength = bytes(_title).length;
+        uint256 descLength = bytes(_description).length;
+        
+        if (titleLength == 0) revert DAOGovernance__EmptyTitle();
+        if (descLength == 0) revert DAOGovernance__EmptyDescription();
+        if (titleLength > MAX_TITLE_LENGTH || descLength > MAX_DESCRIPTION_LENGTH) 
+            revert DAOGovernance__StringTooLong();
+        
+        if (_targetContract == address(0)) revert DAOGovernance__InvalidAddress();
+        if (treasury.balanceOf(msg.sender) < MIN_TOKENS_TO_PROPOSE)
+            revert DAOGovernance__NotEnoughTokens();
     }
 
     /*//////////////////////////////////////////////////////////////
                         VIEW FUNCTIONS
     //////////////////////////////////////////////////////////////*/
-    function getProposalState(uint256 proposalId)
-        external
-        view
-        returns (ProposalState)
-    {
-        if (proposalId >= proposalCount)
-            revert DAOGovernance__ProposalDoesNotExist();
-
+    function getProposalState(uint256 proposalId) external view returns (ProposalState) {
+        if (proposalId >= proposalCount) revert DAOGovernance__ProposalDoesNotExist();
         return proposals[proposalId].state;
     }
 
-    function getProposal(uint256 proposalId)
-        external
-        view
-        returns (Proposal memory)
-    {
-        if (proposalId >= proposalCount)
-            revert DAOGovernance__ProposalDoesNotExist();
+    function getProposal(uint256 proposalId) external view returns (Proposal memory) {
+        if (proposalId >= proposalCount) revert DAOGovernance__ProposalDoesNotExist();
         return proposals[proposalId];
     }
 
