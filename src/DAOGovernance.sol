@@ -315,4 +315,9 @@ contract DAOGovernance is ReentrancyGuard {
     function getProposalCount() external view returns (uint256) {
         return proposalCount;
     }
+
+    function hasUserVoted(address user, uint256 proposalId) external view returns (bool) {
+        if (proposalId >= proposalCount) revert DAOGovernance__ProposalDoesNotExist();
+        return hasVoted[proposalId][user];
+    }
 }
