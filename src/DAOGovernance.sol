@@ -241,7 +241,7 @@ contract DAOGovernance is ReentrancyGuard {
 
         ProposalCore memory core = proposalCore[proposalId];
 
-        // ✅ SPRAWDŹ executedAt NAJPIERW (przed state check)
+
         if (proposalExecutedAt[proposalId] != 0) {
             revert DAOGovernance__ProposalAlreadyExecuted();
         }
