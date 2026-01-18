@@ -135,6 +135,24 @@ contract DAOGovernanceTest is Test {
         );
     }
 
+    function testCreateProposalRevertStringTooLong() public {
+        vm.prank(user1);
+        treasury.deposit{value: 3 ether}();
+
+        vm.prank(user1);
+        vm.expectRevert(DAOGovernance.DAOGovernance__StringTooLong.selector);
+        governance.createProposal(
+            DAOGovernance.ProposalParams({
+                title: "SDAFDASJFSAJFASJFSAJFSAJFISAJFSAJFSAJFSAJFASJFJSAJFSAJFSAJFASJIFSAFOSAOFISAIFJOSAJIFOSAIOJFASOIF:ASOFSAOIFASFSAIFJASFIAS",
+                description: "Test",
+                targetContract: mockTarget,
+                callData: "",
+                ethAmount: 0
+            })
+        );
+
+    }
+
     /*//////////////////////////////////////////////////////////////
                         TEST: VOTING
     //////////////////////////////////////////////////////////////*/
