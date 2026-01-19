@@ -142,7 +142,60 @@ contract DAOTreasuryTest is Test {
 
     vm.expectRevert(DAOTreasury.DAOTreasury__TransferFailed.selector);
     receiver.depositAndWithdraw();
-}
+    }
+
+   function testWithdrawWhenProfitExceedsTotalDeposits() public {
+
+        vm.prank(user1);
+        treasury.deposit{value: 1 ether}();
+        
+  
+        assertEq(treasury.totalDeposits(), 1 ether);
+        assertEq(address(treasury).balance, 1 ether);
+        
+       
+        vm.deal(address(treasury), 11 ether); 
+        
+   
+        assertEq(treasury.totalDeposits(), 1 ether);
+        assertEq(address(treasury).balance, 11 ether);
+        
+    
+        uint256 user1BalanceBefore = user1.balance;
+        
+        vm.prank(user1);
+        treasury.withdraw(1 ether); 
+        
+ 
+        uint256 ethReceived = user1.balance - user1BalanceBefore;
+        assertEq(ethReceived, 11 ether);
+       
+        assertEq(treasury.totalDeposits(), 0);
+        
+     
+        assertEq(address(treasury).balance, 0);
+    }
+
+
+     //////////////////////////////
+    //   SET GOVERNANCE TESTS    //
+    //////////////////////////////
+
+
+    function testSetGovernanceRevertIfInvalidAddress() public {
+        vm.prank(address(this));
+        vm.expectRevert(DAOTreasury.DAOTreasury__InvalidAddress.selector);
+        treasury.setGovernance(address(0));
+    }
+
+    function testSetGovernanceRevertIfAlreadySet() public {
+        address target = 0x0000000000000000000000000000000000000001;
+        address target2 = 0x0000000000000000000000000000000000000002;
+        vm.prank(address(this));
+        treasury.setGovernance(target);
+        vm.expectRevert(DAOTreasury.DAOTreasury__GovernanceAlreadySet.selector);
+        treasury.setGovernance(target2);
+    }
 
 }
 
