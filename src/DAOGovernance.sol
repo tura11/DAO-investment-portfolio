@@ -135,7 +135,7 @@ contract DAOGovernance is ReentrancyGuard {
 
     event ProposalFinalized(
         uint256 indexed proposalId,
-        uint256 indexed finalizer
+        address indexed finalizer
         );
 
 
