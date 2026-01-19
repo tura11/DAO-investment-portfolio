@@ -232,7 +232,7 @@ contract DAOGovernanceTest is Test {
     vm.prank(user1);
     vm.expectRevert(DAOGovernance.DAOGovernance__ProposalDoesNotExist.selector);
     governance.vote(999, DAOGovernance.VoteType.For);
-}
+    }
 
     function testCannotVoteAfterVotingEnds() public {
         uint256 proposalId = _createTestProposal();
@@ -636,8 +636,128 @@ contract DAOGovernanceTest is Test {
         uint(governance.getUserVote(proposalId, user2)), 
         uint(DAOGovernance.VoteType.For)
     );
-
     }
+    /*//////////////////////////////////////////////////////////////
+                    TEST: EDGE CASES & COVERAGE
+    //////////////////////////////////////////////////////////////*/
+
+    function testCannotDeployWithZeroAddress() public {
+        vm.expectRevert(DAOGovernance.DAOGovernance__InvalidAddress.selector);
+        new DAOGovernance(address(0));
+    }
+
+    function testGetProposalRevertsForInvalidId() public {
+        vm.expectRevert(DAOGovernance.DAOGovernance__ProposalDoesNotExist.selector);
+        governance.getProposal(999);
+    }
+
+    function testGetProposalStateRevertsForInvalidId() public {
+        vm.expectRevert(DAOGovernance.DAOGovernance__ProposalDoesNotExist.selector);
+        governance.getProposalState(999);
+    }
+
+    function testFinalizeProposalRevertsForInvalidId() public {
+        vm.expectRevert(DAOGovernance.DAOGovernance__ProposalDoesNotExist.selector);
+        governance.finalizeProposal(999);
+    }
+
+    function testExecuteProposalRevertsForInvalidId() public {
+        vm.expectRevert(DAOGovernance.DAOGovernance__ProposalDoesNotExist.selector);
+        governance.executeProposal(999);
+    }
+
+    function testCancelProposalRevertsForInvalidId() public {
+        vm.expectRevert(DAOGovernance.DAOGovernance__ProposalDoesNotExist.selector);
+        governance.cancelProposal(999);
+    }
+
+    function testHasUserVotedRevertsForInvalidId() public {
+        vm.expectRevert(DAOGovernance.DAOGovernance__ProposalDoesNotExist.selector);
+        governance.hasUserVoted(999, user1);
+    }
+
+    function testGetUserVoteRevertsForInvalidId() public {
+        vm.expectRevert(DAOGovernance.DAOGovernance__ProposalDoesNotExist.selector);
+        governance.getUserVote(999, user1);
+    }
+
+    function testGetVotingResultsRevertsForInvalidId() public {
+        vm.expectRevert(DAOGovernance.DAOGovernance__ProposalDoesNotExist.selector);
+        governance.getVotingResults(999);
+    }
+
+    function testCannotFinalizeAlreadyFinalizedProposal() public {
+        uint256 proposalId = _createTestProposal();
+
+        vm.prank(user2);
+        treasury.deposit{value: 5 ether}();
+
+        vm.prank(user2);
+        governance.vote(proposalId, DAOGovernance.VoteType.For);
+
+        vm.warp(block.timestamp + 7 days + 1);
+
+        // First finalize
+        governance.finalizeProposal(proposalId);
+
+        // Second finalize - should return early (no-op, no revert)
+        governance.finalizeProposal(proposalId);
+        
+        // Verify state is still Succeeded
+        assertEq(
+            uint(governance.getProposalState(proposalId)),
+            uint(DAOGovernance.ProposalState.Succeeded)
+        );
+    }
+
+    function testFinalizeProposalWithZeroTotalSupply() public {
+        uint256 proposalId = _createTestProposal();
+        
+        vm.prank(user1);
+        governance.vote(proposalId, DAOGovernance.VoteType.For);
+        
+        // User1 withdraws ALL tokens (totalSupply becomes 0)
+        vm.prank(user1);
+        treasury.withdraw(1 ether);
+        
+        assertEq(treasury.totalSupply(), 0);
+        
+        vm.warp(block.timestamp + 7 days + 1);
+        governance.finalizeProposal(proposalId);
+        
+        // Should be defeated due to zero total supply
+        assertEq(
+            uint(governance.getProposalState(proposalId)),
+            uint(DAOGovernance.ProposalState.Defeated)
+        );
+    }
+
+    function testCannotCancelSucceededProposal() public {
+        uint256 proposalId = _createTestProposal();
+
+        vm.prank(user2);
+        treasury.deposit{value: 5 ether}();
+
+        vm.prank(user2);
+        governance.vote(proposalId, DAOGovernance.VoteType.For);
+
+        vm.warp(block.timestamp + 7 days + 1);
+        governance.finalizeProposal(proposalId);
+
+        // State is Succeeded (not yet executed)
+        assertEq(
+            uint(governance.getProposalState(proposalId)), 
+            uint(DAOGovernance.ProposalState.Succeeded)
+        );
+
+        // Try to cancel - should fail
+        vm.prank(user1);
+        vm.expectRevert(DAOGovernance.DAOGovernance__CannotCancelProposal.selector);
+        governance.cancelProposal(proposalId);
+    }
+
+
+
     /*//////////////////////////////////////////////////////////////
                         HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
