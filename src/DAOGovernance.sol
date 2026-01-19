@@ -331,7 +331,9 @@ contract DAOGovernance is ReentrancyGuard {
 
         uint256 totalSupply = treasury.totalSupply();
         if (totalSupply == 0) return ProposalState.Defeated;
-
+        
+        if(totalVotes == 0) return ProposalState.Defeated;
+        
         uint256 quorumPercentage = (totalVotes * 100) / totalSupply;
         if (quorumPercentage < QUORUM_PERCENTAGE) return ProposalState.Defeated;
 
