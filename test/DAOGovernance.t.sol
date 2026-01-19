@@ -623,6 +623,21 @@ contract DAOGovernanceTest is Test {
         assertEq(governance.getProposalCount(), 2);
     }
 
+    function testGetUserVote() public {
+       uint256 proposalId = _createTestProposal();
+
+       vm.prank(user2);
+       treasury.deposit{value: 3 ether}();
+
+       vm.prank(user2);
+       governance.vote(proposalId, DAOGovernance.VoteType.For);
+
+       assertEq(
+        uint(governance.getUserVote(proposalId, user2)), 
+        uint(DAOGovernance.VoteType.For)
+    );
+
+    }
     /*//////////////////////////////////////////////////////////////
                         HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
