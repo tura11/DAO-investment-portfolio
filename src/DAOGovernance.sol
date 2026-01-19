@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { DAOTreasury } from "./DAOTreasury.sol";
@@ -133,6 +133,12 @@ contract DAOGovernance is ReentrancyGuard {
         address indexed canceler
     );
 
+    event ProposalFinalized(
+        uint256 indexed proposalId,
+        uint256 indexed finalizer
+        );
+
+
     /*//////////////////////////////////////////////////////////////
                             CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -230,6 +236,8 @@ contract DAOGovernance is ReentrancyGuard {
         if (proposalState[proposalId] != ProposalState.Active) return;
 
         proposalState[proposalId] = _calculateFinalState(proposalId);
+
+        emit ProposalFinalized(proposalId, msg.sender);
     }
 
     /*//////////////////////////////////////////////////////////////
