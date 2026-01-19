@@ -197,6 +197,56 @@ contract DAOTreasuryTest is Test {
         treasury.setGovernance(target2);
     }
 
+
+    function testSetGovernanceSuccesful() public {
+        vm.prank(address(this));
+        address target = 0x0000000000000000000000000000000000000001;
+        treasury.setGovernance(target);
+        assertEq(treasury.governance(), target);
+    }
+
+
+     //////////////////////////////
+    //  EXECUTE PROPOSAL TESTS   //
+    //////////////////////////////
+
+
+    function testExecuteProposalRevertIfUnauthorized() public {
+        address target = 0x0000000000000000000000000000000000000001;
+        vm.prank(user1);
+        vm.expectRevert(DAOTreasury.DAOTreasury__Unauthorized.selector);
+        treasury.executeTransaction(target, 1 ether,"");
+    }
+
+    function testExecuteProposalRevertIfInsufficientFunds() public {
+        address target = 0x0000000000000000000000000000000000000001;
+        vm.prank(address(this));
+        treasury.setGovernance(address(this));
+        vm.expectRevert(DAOTreasury.DAOTreasury__InsufficientFunds.selector);
+        treasury.executeTransaction(target, 1 ether,"");
+    }
+
+    function testExecuteProposalRevertIfTransactionFailed() public {
+    RevertingTarget target = new RevertingTarget();
+
+    treasury.setGovernance(address(this));
+    vm.deal(address(treasury), 1 ether);
+
+    vm.expectRevert(DAOTreasury.DAOTreasury__ExecutionFailed.selector);
+
+    treasury.executeTransaction(
+        address(target),
+        0,
+        abi.encodeWithSelector(RevertingTarget.boom.selector)
+    );
+
+    }
+}
+
+contract RevertingTarget {
+    function boom() external payable {
+        revert("boom");
+    }
 }
 
 contract RevertingReceiver {
