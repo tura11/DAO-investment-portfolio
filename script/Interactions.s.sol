@@ -20,6 +20,20 @@ contract DepositToTreasury is Script {
         address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment("DAOTreasury", block.chainid);
         depositToTreasury(mostRecentlyDeployed, 1 ether);
     }  
+}
 
 
+contract WithdrawFromTreasury is Script {
+    function withdrawFromTreasury(address treasuryAddress, uint256 tokenAmount) public {
+        vm.startBroadcast();
+        DAOTreasury treasury = DAOTreasury(payable(treasuryAddress));
+        treasury.withdraw(tokenAmount);
+        vm.stopBroadcast();
+        console.log("Withdrew %s tokens from treasury at %s", tokenAmount, treasuryAddress);
+    }
+
+    function run() external {
+        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment("DAOTreasury", block.chainid);
+        withdrawFromTreasury(mostRecentlyDeployed, 1 ether);
+    }
 }
