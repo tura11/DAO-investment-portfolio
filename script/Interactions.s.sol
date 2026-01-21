@@ -37,3 +37,48 @@ contract WithdrawFromTreasury is Script {
         withdrawFromTreasury(mostRecentlyDeployed, 1 ether);
     }
 }
+
+
+contract CreateProposal is Script {
+    function createProposal(
+        address governanceAddress,
+        string memory title,
+        string memory description,
+        address targetContract,
+        bytes memory callData,
+        uint256 ethAmount
+    ) public returns (uint256) {
+        vm.startBroadcast();
+        DAOGovernance governance = DAOGovernance(governanceAddress);
+        
+        DAOGovernance.ProposalParams memory params = DAOGovernance.ProposalParams({
+            title: title,
+            description: description,
+            targetContract: targetContract,
+            callData: callData,
+            ethAmount: ethAmount
+        });
+        
+        uint256 proposalId = governance.createProposal(params);
+        vm.stopBroadcast();
+        
+        console.log("Created proposal #%s: %s", proposalId, title);
+        return proposalId;
+    }
+
+    function run() external {
+        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment("DAOGovernance", block.chainid);
+        
+        address recipient = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
+        bytes memory callData = "";
+
+        createProposal(
+            mostRecentlyDeployed,
+            "Fund Community Initiative",
+            "Proposal to allocate 1 ETH for community development",
+            recipient,
+            callData,
+            1 ether
+            );
+    }
+}   
