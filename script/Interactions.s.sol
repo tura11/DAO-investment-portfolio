@@ -81,4 +81,28 @@ contract CreateProposal is Script {
             1 ether
             );
     }
-}   
+} 
+
+
+
+contract VoteOnProposal is Script{
+    function voteOnProposal(
+        address governanceAddress,
+        uint256 proposalId,
+        DAOGovernance.VoteType voteType
+    ) public {
+        vm.startBroadcast();
+        DAOGovernance governance = DAOGovernance(governanceAddress);
+        governance.vote(proposalId, voteType);
+        vm.stopBroadcast();
+
+        string memory voteTypeStr = voteType == DAOGovernance.VoteType.For ? "FOR" :
+                                                voteType == DAOGovernance.VoteType.Against ? "AGAINST" : "ABSTAIN";
+        console.log("Voted %s on proposal #%s", voteTypeStr, proposalId);
+    }
+
+    function run() external {
+        address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment("DAOGovernance", block.chainid);
+        voteOnProposal(mostRecentlyDeployed, 0, DAOGovernance.VoteType.For);
+    }
+}
