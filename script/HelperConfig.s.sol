@@ -58,7 +58,7 @@ contract HelperConfig is Script {
     function getAnvilConfig() public view returns (NetworkConfig memory) {
         return NetworkConfig({
             deployerKey: DEAFULT_ANVIL_PRIVATE_KEY,
-            initialOwner: vm.addr(DEAFULT_ANVIL_PRIVATE_KEY);
+            initialOwner: vm.addr(DEAFULT_ANVIL_PRIVATE_KEY)
              });
     }
 
