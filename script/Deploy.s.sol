@@ -13,8 +13,8 @@ contract Deploy is Script{
 
         vm.startBroadcast(deployerPrivateKey);
 
-        DAOTreasury terasury = new DAOTreasury();
-        DAOGovernance governance = new DAOGovernance(address(terasury));
+        DAOTreasury treasury = new DAOTreasury();
+        DAOGovernance governance = new DAOGovernance(address(treasury));
 
         vm.stopBroadcast();
 
