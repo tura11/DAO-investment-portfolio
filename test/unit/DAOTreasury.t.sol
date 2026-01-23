@@ -2,15 +2,17 @@
 pragma  solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
+import {IDAOTreasury} from "../../src/interfaces/IDAOTreasury.sol";
 import {DAOTreasury} from "../../src/DAOTreasury.sol";
 
-contract DAOTreasuryTest is Test {
-    DAOTreasury public treasury;
+contract IDAOTreasuryTest is Test {
+    IDAOTreasury public treasury;
+    DAOTreasury public dao;
     address user1;
     address user2;
 
     function setUp() public {
-        treasury = new DAOTreasury();
+        treasury = IDAOTreasury(address(new DAOTreasury()));
 
         user1 = makeAddr("user1");
         user2 = makeAddr("user2");
@@ -33,14 +35,14 @@ contract DAOTreasuryTest is Test {
 
     function testDepositRevertIfDepositTooSmall() public {
         vm.prank(user1);
-        vm.expectRevert(DAOTreasury.DAOTreasury__DepositTooSmall.selector);
+        vm.expectRevert(IDAOTreasury.DAOTreasury__DepositTooSmall.selector);
         treasury.deposit{value: 0.0001 ether}();
     }
 
     function testDepositEmitsEvent() public {
         vm.prank(user1);
         vm.expectEmit(true, false, false, true);
-        emit DAOTreasury.Deposited(user1, 1 ether, 1 ether);
+        emit IDAOTreasury.Deposited(user1, 1 ether, 1 ether);
         treasury.deposit{value: 1 ether}();
     }
 
@@ -112,7 +114,7 @@ contract DAOTreasuryTest is Test {
     }
     function testWithdrawRevertIfNotEnoughTokens() public {
         vm.prank(user1);
-        vm.expectRevert(DAOTreasury.DAOTreasury__NotEnoughTokens.selector);
+        vm.expectRevert(IDAOTreasury.DAOTreasury__NotEnoughTokens.selector);
         treasury.withdraw(1 ether);
     }
     function testWithdrawRevertIfInsufficientFunds() public {
@@ -122,7 +124,7 @@ contract DAOTreasuryTest is Test {
         vm.deal(address(treasury), 0);
 
         vm.prank(user1);
-        vm.expectRevert(DAOTreasury.DAOTreasury__InsufficientFunds.selector);
+        vm.expectRevert(IDAOTreasury.DAOTreasury__InsufficientFunds.selector);
         treasury.withdraw(1 ether);
     }
 
@@ -132,7 +134,7 @@ contract DAOTreasuryTest is Test {
 
         vm.prank(user1);
         vm.expectEmit(true, false, false, true);
-        emit DAOTreasury.Withdrawn(user1, 1 ether, 1 ether);
+        emit IDAOTreasury.Withdrawn(user1, 1 ether, 1 ether);
         treasury.withdraw(1 ether);
     }
 
@@ -140,7 +142,7 @@ contract DAOTreasuryTest is Test {
     RevertingReceiver receiver = new RevertingReceiver(treasury);
     vm.deal(address(receiver), 1 ether);
 
-    vm.expectRevert(DAOTreasury.DAOTreasury__TransferFailed.selector);
+    vm.expectRevert(IDAOTreasury.DAOTreasury__TransferFailed.selector);
     receiver.depositAndWithdraw();
     }
 
@@ -184,7 +186,7 @@ contract DAOTreasuryTest is Test {
 
     function testSetGovernanceRevertIfInvalidAddress() public {
         vm.prank(address(this));
-        vm.expectRevert(DAOTreasury.DAOTreasury__InvalidAddress.selector);
+        vm.expectRevert(IDAOTreasury.DAOTreasury__InvalidAddress.selector);
         treasury.setGovernance(address(0));
     }
 
@@ -193,7 +195,7 @@ contract DAOTreasuryTest is Test {
         address target2 = 0x0000000000000000000000000000000000000002;
         vm.prank(address(this));
         treasury.setGovernance(target);
-        vm.expectRevert(DAOTreasury.DAOTreasury__GovernanceAlreadySet.selector);
+        vm.expectRevert(IDAOTreasury.DAOTreasury__GovernanceAlreadySet.selector);
         treasury.setGovernance(target2);
     }
 
@@ -214,7 +216,7 @@ contract DAOTreasuryTest is Test {
     function testExecuteProposalRevertIfUnauthorized() public {
         address target = 0x0000000000000000000000000000000000000001;
         vm.prank(user1);
-        vm.expectRevert(DAOTreasury.DAOTreasury__Unauthorized.selector);
+        vm.expectRevert(IDAOTreasury.DAOTreasury__Unauthorized.selector);
         treasury.executeTransaction(target, 1 ether,"");
     }
 
@@ -222,7 +224,7 @@ contract DAOTreasuryTest is Test {
         address target = 0x0000000000000000000000000000000000000001;
         vm.prank(address(this));
         treasury.setGovernance(address(this));
-        vm.expectRevert(DAOTreasury.DAOTreasury__InsufficientFunds.selector);
+        vm.expectRevert(IDAOTreasury.DAOTreasury__InsufficientFunds.selector);
         treasury.executeTransaction(target, 1 ether,"");
     }
 
@@ -232,7 +234,7 @@ contract DAOTreasuryTest is Test {
     treasury.setGovernance(address(this));
     vm.deal(address(treasury), 1 ether);
 
-    vm.expectRevert(DAOTreasury.DAOTreasury__ExecutionFailed.selector);
+    vm.expectRevert(IDAOTreasury.DAOTreasury__ExecutionFailed.selector);
 
     treasury.executeTransaction(
         address(target),
@@ -250,9 +252,9 @@ contract RevertingTarget {
 }
 
 contract RevertingReceiver {
-    DAOTreasury treasury;
+    IDAOTreasury treasury;
 
-    constructor(DAOTreasury _treasury) {
+    constructor(IDAOTreasury _treasury) {
         treasury = _treasury;
     }
 
