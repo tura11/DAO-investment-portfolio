@@ -2,8 +2,8 @@
 pragma solidity 0.8.24;
 
 import {Test, console} from "forge-std/Test.sol";
-import {DAOGovernance} from "../src/DAOGovernance.sol";
-import {DAOTreasury} from "../src/DAOTreasury.sol";
+import {DAOGovernance} from "../../src/DAOGovernance.sol";
+import {DAOTreasury} from "../../src/DAOTreasury.sol";
 
 contract DAOGovernanceTest is Test {
     DAOGovernance public governance;
