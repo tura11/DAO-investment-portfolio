@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import { DAOTreasury } from "./DAOTreasury.sol";
+import { IDAOTreasury } from "./interfaces/IDAOTreasury.sol";
 
 contract DAOGovernance is ReentrancyGuard {
     /*//////////////////////////////////////////////////////////////
@@ -89,7 +89,7 @@ contract DAOGovernance is ReentrancyGuard {
     mapping(uint256 => mapping(address => VoteType)) public userVote;
     
     uint256 public proposalCount;
-    DAOTreasury public immutable treasury;
+    IDAOTreasury public immutable treasury;
 
     /*//////////////////////////////////////////////////////////////
                             CONSTANTS
@@ -144,7 +144,7 @@ contract DAOGovernance is ReentrancyGuard {
     //////////////////////////////////////////////////////////////*/
     constructor(address _treasury) {
         if (_treasury == address(0)) revert DAOGovernance__InvalidAddress();
-        treasury = DAOTreasury(_treasury);
+        treasury = IDAOTreasury(_treasury);
     }
 
     /*//////////////////////////////////////////////////////////////
