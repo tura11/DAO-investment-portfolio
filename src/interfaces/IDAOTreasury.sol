@@ -33,4 +33,11 @@ interface IDAOTreasury {
     function getTotalTokensMinted() external view returns (uint256);
     function balanceOf(address account) external view returns (uint256);
     function totalSupply() external view returns (uint256);
+
+
+    //getters
+    function totalDeposits() external view returns (uint256);
+    function governance() external view returns (address);
+
+
 }
