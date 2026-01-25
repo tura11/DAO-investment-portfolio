@@ -23,5 +23,37 @@ contract MockTarget {
 
     mapping(address => uint256) public tokenBalance;         // Simulate token balances
 
+    /*//////////////////////////////////////////////////////////////
+                                EVENTS
+    //////////////////////////////////////////////////////////////*/
     
+    event FunctionCalled(address indexed caller, uint256 value, bytes data);
+    event EthReceived(address indexed sender, uint256 amount);
+    event Deposited(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event Swapped(address indexed user, uint256 amountIn, uint256 amountOut);
+    event Staked(address indexed user, uint256 amount);//
+
+
+    /*//////////////////////////////////////////////////////////////
+                        AAVE-LIKE FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+    
+    /// @notice Simulate Aave deposit (supply)
+    /// @dev Real Aave: function supply(address asset, uint256 amount, address onBehalfOf)
+    function supply(address asset, uint256 amount, address onBehalfOf) external payable {
+        callCount++;
+        lastCaller = msg.sender;
+        lastCallData = msg.data;
+
+        deposits[onBehalfOf] += amount;
+        totalEthReceived += msg.value;
+
+        tokenBalances[onBehalfOf] += amount;
+
+
+        emit Deposited(onBehalfOf, amount);
+        emit FunctionCalled(msg.sender, amount, msg.data);  
+    }
+
 }
