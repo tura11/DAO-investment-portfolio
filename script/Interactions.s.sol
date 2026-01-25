@@ -205,4 +205,6 @@ contract GetTreasuryInfo is Script {
         address mostRecentlyDeployed = DevOpsTools.get_most_recent_deployment("DAOTreasury", block.chainid);
         getTreasuryInfo(mostRecentlyDeployed);
     }
+
+    
 }

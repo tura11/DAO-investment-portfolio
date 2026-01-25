@@ -159,4 +159,6 @@ contract MockFailingTarget {
     receive() external payable {
         revert AlwaysFails();
     }
+
+    
 }
