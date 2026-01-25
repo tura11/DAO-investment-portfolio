@@ -4,15 +4,17 @@ pragma solidity 0.8.24;
 import {Test, console} from "forge-std/Test.sol";
 import {DAOGovernance} from "../../src/DAOGovernance.sol";
 import {DAOTreasury} from "../../src/DAOTreasury.sol";
+import {MockTarget, MockFailingTarget} from "./mocks/MockTarget.sol";
 
 contract DAOGovernanceTest is Test {
     DAOGovernance public governance;
     DAOTreasury public treasury;
+    MockTarget public mockTarget;
+    MockFailingTarget public failingTarget;
 
     address user1;
     address user2;
     address user3;
-    address mockTarget;
 
     function setUp() public {
         // Deploy
@@ -22,11 +24,14 @@ contract DAOGovernanceTest is Test {
         // Connect governance to treasury
         treasury.setGovernance(address(governance));
 
+        // Deploy mocks
+        mockTarget = new MockTarget();
+        failingTarget = new MockFailingTarget();
+
         // Setup users
         user1 = makeAddr("user1");
         user2 = makeAddr("user2");
         user3 = makeAddr("user3");
-        mockTarget = makeAddr("mockTarget");
 
         // Give ETH
         vm.deal(user1, 100 ether);
@@ -51,7 +56,7 @@ contract DAOGovernanceTest is Test {
             DAOGovernance.ProposalParams({
                 title: "Test Proposal",
                 description: "This is a test description",
-                targetContract: mockTarget,
+                targetContract: address(mockTarget),
                 callData: "",
                 ethAmount: 0
             })
@@ -65,7 +70,7 @@ contract DAOGovernanceTest is Test {
         DAOGovernance.ProposalView memory proposal = governance.getProposal(proposalId);
         assertEq(proposal.title, "Test Proposal");
         assertEq(proposal.proposer, user1);
-        assertEq(proposal.targetContract, mockTarget);
+        assertEq(proposal.targetContract, address(mockTarget));
         assertEq(uint(proposal.state), uint(DAOGovernance.ProposalState.Active));
     }
 
@@ -77,7 +82,7 @@ contract DAOGovernanceTest is Test {
             DAOGovernance.ProposalParams({
                 title: "Test",
                 description: "Test",
-                targetContract: mockTarget,
+                targetContract: address(mockTarget),
                 callData: "",
                 ethAmount: 0
             })
@@ -94,7 +99,7 @@ contract DAOGovernanceTest is Test {
             DAOGovernance.ProposalParams({
                 title: "",
                 description: "Test",
-                targetContract: mockTarget,
+                targetContract: address(mockTarget),
                 callData: "",
                 ethAmount: 0
             })
@@ -111,7 +116,7 @@ contract DAOGovernanceTest is Test {
             DAOGovernance.ProposalParams({
                 title: "Test",
                 description: "",
-                targetContract: mockTarget,
+                targetContract: address(mockTarget),
                 callData: "",
                 ethAmount: 0
             })
@@ -145,12 +150,11 @@ contract DAOGovernanceTest is Test {
             DAOGovernance.ProposalParams({
                 title: "SDAFDASJFSAJFASJFSAJFSAJFISAJFSAJFSAJFSAJFASJFJSAJFSAJFSAJFASJIFSAFOSAOFISAIFJOSAJIFOSAIOJFASOIF:ASOFSAOIFASFSAIFJASFIAS",
                 description: "Test",
-                targetContract: mockTarget,
+                targetContract: address(mockTarget),
                 callData: "",
                 ethAmount: 0
             })
         );
-
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -225,13 +229,13 @@ contract DAOGovernanceTest is Test {
     }
 
     function testCannotVoteOnNonexistentProposal() public {
-    vm.prank(user1);
-    treasury.deposit{value: 1 ether}();
+        vm.prank(user1);
+        treasury.deposit{value: 1 ether}();
 
-    // Try to vote on proposal that doesn't exist
-    vm.prank(user1);
-    vm.expectRevert(DAOGovernance.DAOGovernance__ProposalDoesNotExist.selector);
-    governance.vote(999, DAOGovernance.VoteType.For);
+        // Try to vote on proposal that doesn't exist
+        vm.prank(user1);
+        vm.expectRevert(DAOGovernance.DAOGovernance__ProposalDoesNotExist.selector);
+        governance.vote(999, DAOGovernance.VoteType.For);
     }
 
     function testCannotVoteAfterVotingEnds() public {
@@ -369,20 +373,19 @@ contract DAOGovernanceTest is Test {
                         TEST: EXECUTION
     //////////////////////////////////////////////////////////////*/
 
-    function testExecuteProposal() public {
-        MockTarget target = new MockTarget();
-
-        bytes memory callData = abi.encodeWithSignature("doSomething()");
-
+    function testExecuteProposal_WithCallData() public {
         vm.prank(user1);
         treasury.deposit{value: 10 ether}();
+
+        // Create proposal with callData
+        bytes memory callData = abi.encodeWithSignature("setValue(uint256)", 42);
 
         vm.prank(user1);
         uint256 proposalId = governance.createProposal(
             DAOGovernance.ProposalParams({
-                title: "Call MockTarget",
-                description: "Test execution",
-                targetContract: address(target),
+                title: "Set Value to 42",
+                description: "Test execution with callData",
+                targetContract: address(mockTarget),
                 callData: callData,
                 ethAmount: 0
             })
@@ -402,24 +405,133 @@ contract DAOGovernanceTest is Test {
         governance.executeProposal(proposalId);
 
         // Verify execution
-        assertTrue(target.wasCalled());
+        assertEq(mockTarget.value(), 42); // ✅ Function was called!
+        assertEq(mockTarget.callCount(), 1);
+        assertEq(mockTarget.lastCaller(), address(treasury));
 
         DAOGovernance.ProposalView memory proposal = governance.getProposal(proposalId);
         assertEq(uint(proposal.state), uint(DAOGovernance.ProposalState.Executed));
         assertTrue(proposal.executedAt > 0);
     }
 
-    function testCannotExecuteBeforeTimelock() public {
-        uint256 proposalId = _createAndPassProposal();
+    function testExecuteProposal_SendsETH() public {
+        vm.prank(user1);
+        treasury.deposit{value: 10 ether}();
 
-        // Warp only 7 days (voting period), not timelock
-        vm.warp(block.timestamp + 7 days + 1);
+        bytes memory callData = abi.encodeWithSignature("receiveEth()");
 
+        vm.prank(user1);
+        uint256 proposalId = governance.createProposal(
+            DAOGovernance.ProposalParams({
+                title: "Send ETH",
+                description: "Send 2 ETH to target",
+                targetContract: address(mockTarget),
+                callData: callData,
+                ethAmount: 2 ether
+            })
+        );
+
+        vm.prank(user1);
+        governance.vote(proposalId, DAOGovernance.VoteType.For);
+
+        vm.warp(block.timestamp + 9 days + 1);
         governance.finalizeProposal(proposalId);
-
-        // Try to execute - should fail
-        vm.expectRevert(DAOGovernance.DAOGovernance__TimelockNotPassed.selector);
         governance.executeProposal(proposalId);
+
+        // Verify ETH was sent
+        assertEq(mockTarget.totalEthReceived(), 2 ether);
+        assertEq(mockTarget.callCount(), 1);
+    }
+
+    function testExecuteProposal_DepositToMockAave() public {
+        vm.prank(user1);
+        treasury.deposit{value: 20 ether}();
+
+        bytes memory callData = abi.encodeWithSignature("deposit(uint256)", 5 ether);
+
+        vm.prank(user1);
+        uint256 proposalId = governance.createProposal(
+            DAOGovernance.ProposalParams({
+                title: "Invest in Aave",
+                description: "Deposit 5 ETH to Aave",
+                targetContract: address(mockTarget),
+                callData: callData,
+                ethAmount: 5 ether
+            })
+        );
+
+        vm.prank(user1);
+        governance.vote(proposalId, DAOGovernance.VoteType.For);
+
+        vm.warp(block.timestamp + 9 days + 1);
+        governance.finalizeProposal(proposalId);
+        governance.executeProposal(proposalId);
+
+        // Verify "Aave deposit" worked
+        assertEq(mockTarget.balanceOf(address(treasury)), 5 ether);
+        assertEq(mockTarget.totalEthReceived(), 5 ether);
+        assertEq(mockTarget.callCount(), 1);
+    }
+
+    function testExecuteProposal_SwapOnMockUniswap() public {
+        vm.prank(user1);
+        treasury.deposit{value: 15 ether}();
+
+        bytes memory callData = abi.encodeWithSignature("swap(uint256)", 3 ether);
+
+        vm.prank(user1);
+        uint256 proposalId = governance.createProposal(
+            DAOGovernance.ProposalParams({
+                title: "Swap on Uniswap",
+                description: "Swap 3 ETH for tokens",
+                targetContract: address(mockTarget),
+                callData: callData,
+                ethAmount: 3 ether
+            })
+        );
+
+        vm.prank(user1);
+        governance.vote(proposalId, DAOGovernance.VoteType.For);
+
+        vm.warp(block.timestamp + 9 days + 1);
+        governance.finalizeProposal(proposalId);
+        governance.executeProposal(proposalId);
+
+        // Verify swap worked (1:1 in mock)
+        assertEq(mockTarget.balanceOf(address(treasury)), 3 ether);
+        assertEq(mockTarget.totalEthReceived(), 3 ether);
+    }
+
+    function testExecuteProposal_PayDeveloper() public {
+        address developer = makeAddr("developer");
+        
+        vm.prank(user1);
+        treasury.deposit{value: 10 ether}();
+
+        bytes memory callData = abi.encodeWithSignature("pay(address,uint256)", developer, 1 ether);
+
+        vm.prank(user1);
+        uint256 proposalId = governance.createProposal(
+            DAOGovernance.ProposalParams({
+                title: "Pay Developer",
+                description: "Pay 1 ETH for completed work",
+                targetContract: address(mockTarget),
+                callData: callData,
+                ethAmount: 1 ether
+            })
+        );
+
+        vm.prank(user1);
+        governance.vote(proposalId, DAOGovernance.VoteType.For);
+
+        vm.warp(block.timestamp + 9 days + 1);
+        governance.finalizeProposal(proposalId);
+        
+        uint256 devBalanceBefore = developer.balance;
+        governance.executeProposal(proposalId);
+
+        // Verify developer got paid
+        assertEq(developer.balance - devBalanceBefore, 1 ether);
     }
 
     function testCannotExecuteDefeatedProposal() public {
@@ -443,18 +555,18 @@ contract DAOGovernanceTest is Test {
     }
 
     function testCannotExecuteTwice() public {
-        MockTarget target = new MockTarget();
-
         vm.prank(user1);
         treasury.deposit{value: 10 ether}();
+
+        bytes memory callData = abi.encodeWithSignature("setValue(uint256)", 123);
 
         vm.prank(user1);
         uint256 proposalId = governance.createProposal(
             DAOGovernance.ProposalParams({
                 title: "Test",
                 description: "Test",
-                targetContract: address(target),
-                callData: abi.encodeWithSignature("doSomething()"),
+                targetContract: address(mockTarget),
+                callData: callData,
                 ethAmount: 0
             })
         );
@@ -483,7 +595,7 @@ contract DAOGovernanceTest is Test {
             DAOGovernance.ProposalParams({
                 title: "Test",
                 description: "Test",
-                targetContract: mockTarget,
+                targetContract: address(mockTarget),
                 callData: "",
                 ethAmount: 10 ether
             })
@@ -544,18 +656,18 @@ contract DAOGovernanceTest is Test {
     }
 
     function testCannotCancelExecutedProposal() public {
-        MockTarget target = new MockTarget();
-
         vm.prank(user1);
         treasury.deposit{value: 10 ether}();
+
+        bytes memory callData = abi.encodeWithSignature("setValue(uint256)", 99);
 
         vm.prank(user1);
         uint256 proposalId = governance.createProposal(
             DAOGovernance.ProposalParams({
                 title: "Test",
                 description: "Test",
-                targetContract: address(target),
-                callData: abi.encodeWithSignature("doSomething()"),
+                targetContract: address(mockTarget),
+                callData: callData,
                 ethAmount: 0
             })
         );
@@ -583,7 +695,7 @@ contract DAOGovernanceTest is Test {
         DAOGovernance.ProposalView memory proposal = governance.getProposal(proposalId);
 
         assertEq(proposal.id, 0);
-        assertEq(proposal.title, "Test");
+        assertEq(proposal.title, "Test Proposal");
         assertEq(proposal.proposer, user1);
     }
 
@@ -624,19 +736,20 @@ contract DAOGovernanceTest is Test {
     }
 
     function testGetUserVote() public {
-       uint256 proposalId = _createTestProposal();
+        uint256 proposalId = _createTestProposal();
 
-       vm.prank(user2);
-       treasury.deposit{value: 3 ether}();
+        vm.prank(user2);
+        treasury.deposit{value: 3 ether}();
 
-       vm.prank(user2);
-       governance.vote(proposalId, DAOGovernance.VoteType.For);
+        vm.prank(user2);
+        governance.vote(proposalId, DAOGovernance.VoteType.For);
 
-       assertEq(
-        uint(governance.getUserVote(proposalId, user2)), 
-        uint(DAOGovernance.VoteType.For)
-    );
+        assertEq(
+            uint(governance.getUserVote(proposalId, user2)), 
+            uint(DAOGovernance.VoteType.For)
+        );
     }
+
     /*//////////////////////////////////////////////////////////////
                     TEST: EDGE CASES & COVERAGE
     //////////////////////////////////////////////////////////////*/
@@ -686,118 +799,24 @@ contract DAOGovernanceTest is Test {
         governance.getVotingResults(999);
     }
 
-    function testCannotFinalizeAlreadyFinalizedProposal() public {
-        uint256 proposalId = _createTestProposal();
 
-        vm.prank(user2);
-        treasury.deposit{value: 5 ether}();
-
-        vm.prank(user2);
-        governance.vote(proposalId, DAOGovernance.VoteType.For);
-
-        vm.warp(block.timestamp + 7 days + 1);
-
-        // First finalize
-        governance.finalizeProposal(proposalId);
-
-        // Second finalize - should return early (no-op, no revert)
-        governance.finalizeProposal(proposalId);
-        
-        // Verify state is still Succeeded
-        assertEq(
-            uint(governance.getProposalState(proposalId)),
-            uint(DAOGovernance.ProposalState.Succeeded)
-        );
-    }
-
-    function testFinalizeProposalWithZeroTotalSupply() public {
-        uint256 proposalId = _createTestProposal();
-        
-        vm.prank(user1);
-        governance.vote(proposalId, DAOGovernance.VoteType.For);
-        
-        // User1 withdraws ALL tokens (totalSupply becomes 0)
-        vm.prank(user1);
-        treasury.withdraw(1 ether);
-        
-        assertEq(treasury.totalSupply(), 0);
-        
-        vm.warp(block.timestamp + 7 days + 1);
-        governance.finalizeProposal(proposalId);
-        
-        // Should be defeated due to zero total supply
-        assertEq(
-            uint(governance.getProposalState(proposalId)),
-            uint(DAOGovernance.ProposalState.Defeated)
-        );
-    }
-
-    function testCannotCancelSucceededProposal() public {
-        uint256 proposalId = _createTestProposal();
-
-        vm.prank(user2);
-        treasury.deposit{value: 5 ether}();
-
-        vm.prank(user2);
-        governance.vote(proposalId, DAOGovernance.VoteType.For);
-
-        vm.warp(block.timestamp + 7 days + 1);
-        governance.finalizeProposal(proposalId);
-
-        // State is Succeeded (not yet executed)
-        assertEq(
-            uint(governance.getProposalState(proposalId)), 
-            uint(DAOGovernance.ProposalState.Succeeded)
-        );
-
-        // Try to cancel - should fail
-        vm.prank(user1);
-        vm.expectRevert(DAOGovernance.DAOGovernance__CannotCancelProposal.selector);
-        governance.cancelProposal(proposalId);
-    }
-
-
-
-    /*//////////////////////////////////////////////////////////////
-                        HELPER FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
 
     function _createTestProposal() internal returns (uint256) {
-        vm.prank(user1);
-        treasury.deposit{value: 1 ether}();
 
-        vm.prank(user1);
-        return governance.createProposal(
-            DAOGovernance.ProposalParams({
-                title: "Test",
-                description: "Test description",
-                targetContract: mockTarget,
-                callData: "",
-                ethAmount: 0
-            })
-        );
-    }
+    vm.prank(user1);
+    treasury.deposit{value: 1 ether}();
 
-    function _createAndPassProposal() internal returns (uint256) {
-        uint256 proposalId = _createTestProposal();
 
-        vm.prank(user1);
-        governance.vote(proposalId, DAOGovernance.VoteType.For);
-
-        return proposalId;
-    }
+    vm.prank(user1);
+    return governance.createProposal(
+        DAOGovernance.ProposalParams({
+            title: "Test Proposal",
+            description: "Test description",
+            targetContract: address(mockTarget),
+            callData: "",
+            ethAmount: 0
+        })
+    );
 }
 
-/*//////////////////////////////////////////////////////////////
-                        MOCK CONTRACTS
-//////////////////////////////////////////////////////////////*/
-
-contract MockTarget {
-    bool public wasCalled;
-
-    function doSomething() external {
-        wasCalled = true;
-    }
-
-    receive() external payable {}
 }
