@@ -4,6 +4,32 @@ pragma solidity 0.8.24;
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { IDAOTreasury } from "./interfaces/IDAOTreasury.sol";
 
+
+/**
+ * @title DAOGovernance
+ * @author Tura11
+ * @notice Core governance contract for an on-chain DAO treasury system.
+ *
+ * @dev This contract enables token-weighted governance over a shared ETH treasury.
+ *      DAO members deposit ETH into the DAOTreasury contract and receive governance
+ *      tokens (1:1). These tokens represent both economic ownership and voting power.
+ *
+ *      Key features:
+ *      - Token-weighted proposal creation and voting
+ *      - On-chain execution via DAO-controlled treasury
+ *      - Quorum + approval thresholds
+ *      - Timelock before execution
+ *      - Proposal cancellation logic
+ *
+ *      Governance flow:
+ *      1. Members deposit ETH → receive DAOGOV tokens
+ *      2. Token holders create proposals (calls + ETH transfers)
+ *      3. DAO votes using token-weighted voting
+ *      4. Successful proposals are executed via the treasury
+ *
+ *      The governance contract NEVER holds funds directly.
+ *      All ETH is stored and executed through DAOTreasury.
+ */
 contract DAOGovernance is ReentrancyGuard {
     /*//////////////////////////////////////////////////////////////
                                 ERRORS
