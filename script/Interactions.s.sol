@@ -206,5 +206,5 @@ contract GetTreasuryInfo is Script {
         getTreasuryInfo(mostRecentlyDeployed);
     }
 
-    
+ 
 }
